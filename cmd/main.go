@@ -2,7 +2,10 @@ package main
 
 import (
 	"os"
+	"os/signal"
+	"syscall"
 
+	"github.com/nginH/internal/server"
 	logs "github.com/nginH/pkg/log"
 )
 
@@ -12,38 +15,24 @@ func main() {
 	port := os.Getenv("PORT")
 	if port == "" {
 		logs.Error("PORT is not set")
-		port := "6969"
+		port = "6969"
 		logs.Info("Setting PORT to default value: ", port)
 	}
 
-	// db := server.New()
+	// Create and start server
+	srv := server.New()
+	if err := srv.Start(); err != nil {
+		logs.Fatal("Failed to start server:", err)
+	}
 
-	// logs.Info("Starting the reverse proxy server")
-	// backendUrl, err := url.Parse("http://127.0.0.1:5001/psyched-span-426722-q0/us-central1/dev")
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// proxy := httputil.NewSingleHostReverseProxy(backendUrl)
+	// Wait for interrupt signal
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	<-sigChan
 
-	// originalDirector := proxy.Director
-	// proxy.Director = func(req *http.Request) {
-	// 	originalDirector(req)
-	// 	logs.Info("Request Host: ", req.Host)
-	// 	logs.Info("Request URL: ", req.URL)
-	// }
-	// proxy.ModifyResponse = func(res *http.Response) error {
-	// 	logs.Info("Response Status: ", res.Status)
-	// 	return nil
-	// }
-
-	// proxy.ErrorHandler = func(rw http.ResponseWriter, req *http.Request, err error) {
-	// 	logs.Error("Error: ", err)
-	// 	rw.WriteHeader(http.StatusBadGateway)
-	// }
-
-	// addr := "0.0.0.0:443"
-	// logs.Info("Proxy server started at: https://", addr)
-	// if err := http.ListenAndServeTLS(addr, "/Users/harshanand/proxy-go/cert.pem", "/Users/harshanand/proxy-go/key.pem", proxy); err != nil {
-	// 	logs.Fatal(err)
-	// }
+	// Graceful shutdown
+	logs.Info("Shutting down server...")
+	if err := srv.Stop(); err != nil {
+		logs.Error("Error during shutdown:", err)
+	}
 }
