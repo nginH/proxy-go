@@ -1,0 +1,20 @@
+routes:
+  - name: user
+    query:
+      method: GET
+      path: "/get/user/:id"
+    invalidate:
+      - method: POST
+        path: "update/user/:id"
+      - method: DELETE
+        path: "user/:id"
+
+  - name: news
+    query:
+      method: GET
+      path: "/news/"
+    invalidate:
+      - method: POST
+        path: "news"
+      - method: DELETE
+        path: "news/" 
