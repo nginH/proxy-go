@@ -1,2 +1,9 @@
 *.env
 config.json
+/venv
+/python/service/__pycache__
+/python/service/cache_policy.pt
+/python/service/cache_policy.pt.meta
+/python/service/cache_policy.pt.data-00000-of-00001
+/python/service/cache_policy.pt.index
+/python/venv/

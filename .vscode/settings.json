@@ -1,0 +1,13 @@
+{
+    "cSpell.words": [
+        "protoc",
+        "pycache",
+        "venv"
+    ],
+    "python.analysis.extraPaths": [
+        "./python/cache_pb2_",
+        "./python/cache_pb2_",
+        "./python/cache_pb2_",
+        "./python/cache_pb2_"
+    ]
+}

@@ -7,11 +7,13 @@ import (
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
+	_ "github.com/caddyserver/caddy/v2/modules/caddyhttp/reverseproxy"
+	_ "github.com/caddyserver/caddy/v2/modules/caddyhttp/standard" // Add this import for standard handlers
 	"github.com/nginH/config"
 	"github.com/nginH/internal/repository/database"
-	"github.com/nginH/internal/server/middleware"
 	"github.com/nginH/internal/service"
 	logs "github.com/nginH/pkg/log"
+	"gopkg.in/yaml.v3"
 )
 
 type ProxyServer struct {
@@ -28,9 +30,13 @@ func New() *ProxyServer {
 	}
 	redisClient := database.NewRedisClient()
 	cacheService := service.NewCacheService(redisClient, cfg)
+
 	app := &caddy.Config{
 		Admin: &caddy.AdminConfig{
-			Disabled: true,
+			Disabled: false,
+		},
+		Logging: &caddy.Logging{
+			Sink: &caddy.SinkLog{},
 		},
 	}
 
@@ -43,26 +49,40 @@ func New() *ProxyServer {
 }
 
 func (s *ProxyServer) Start() error {
+	if os.Getenv("ORIGIN_URL") == "" {
+		return fmt.Errorf("ORIGIN_URL is not set")
+	}
+
+	// Create cache middleware configuration with proper initialization
+	cacheHandlerRaw := json.RawMessage(`{
+		"handler": "cache",
+		"redis": {
+			"Client": null,
+			"Ctx": null
+		},
+		"cfg": {}
+	}`)
+
+	// Create reverse proxy handler
+	reverseProxyRaw := json.RawMessage(`{
+		"handler": "reverse_proxy",
+		"upstreams": [{
+			"dial": "` + os.Getenv("ORIGIN_URL") + `"
+		}],
+		"headers": {
+			"request": {
+				"set": {
+					"Host": ["{http.reverse_proxy.upstream.hostport}"]
+				}
+			}
+		}
+	}`)
 	routeConfig := caddyhttp.Route{
 		HandlersRaw: []json.RawMessage{
-			json.RawMessage(`{
-				"handler": "reverse_proxy",
-				"upstreams": [{"dial": "` + os.Getenv("ORIGIN_URL") + `"}]
-			}`),
+			cacheHandlerRaw,
+			reverseProxyRaw,
 		},
 	}
-
-	cacheHandler := &middleware.CacheMiddleware{
-		CacheService: s.cacheService,
-	}
-	cacheHandlerRaw, err := json.Marshal(cacheHandler)
-	if err != nil {
-		return fmt.Errorf("failed to marshal cache handler: %v", err)
-	}
-
-	routeConfig.HandlersRaw = append([]json.RawMessage{
-		cacheHandlerRaw,
-	}, routeConfig.HandlersRaw...)
 
 	httpApp := &caddyhttp.App{
 		Servers: map[string]*caddyhttp.Server{
@@ -100,7 +120,7 @@ func loadConfig(cfg *config.Config) error {
 	}
 	defer file.Close()
 
-	decoder := json.NewDecoder(file)
+	decoder := yaml.NewDecoder(file)
 	if err := decoder.Decode(cfg); err != nil {
 		return err
 	}
